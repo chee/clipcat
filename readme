@@ -5,7 +5,9 @@ a macos launchctl background app that provides a keybinding for a fast, cute, mi
 ## look
 
 a raycast-style overlay: it floats over whatever you're doing, takes the
-keyboard without stealing focus, and goes away when you're done.
+keyboard without stealing focus, and goes away when you're done. drag it by
+its edges, the space round the search bar, or the footer. if you open it again
+within 10 minutes it comes back where you left it.
 
 iosevka rabbits (bundled), thin black lines, tiny corners, hard little
 shadows that grow when something is picked, cream and cherries, hot pink

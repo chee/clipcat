@@ -39,6 +39,11 @@ final class PanelController {
     private var monitor: Any?
     var onSettings: (() -> Void)?
 
+    /// where you dragged each overlay to. used again if it reopens soon.
+    private var placed: [Mode: (origin: NSPoint, at: Date)] = [:]
+    private var placing = false
+    private static let remember: TimeInterval = 10 * 60
+
     /// there's no edit menu in a menu bar app, so do the text field shortcuts by hand
     private static let edits: [String: Selector] = [
         "a": #selector(NSText.selectAll(_:)),
@@ -70,6 +75,10 @@ final class PanelController {
             }
             return event
         }
+        NotificationCenter.default.addObserver(forName: NSWindow.didMoveNotification, object: panel, queue: .main) { [weak self] _ in
+            guard let self, !self.placing, let mode = self.mode else { return }
+            self.placed[mode] = (self.panel.frame.origin, Date())
+        }
     }
 
     func isShowing(_ mode: Mode) -> Bool {
@@ -81,16 +90,24 @@ final class PanelController {
         self.mode = mode
         self.keys = keys
         panel.contentView = NSHostingView(rootView: view)
-        let mouse = NSEvent.mouseLocation
-        let screen = NSScreen.screens.first { NSMouseInRect(mouse, $0.frame, false) } ?? NSScreen.main
-        if let frame = screen?.visibleFrame {
-            panel.setFrame(NSRect(
-                x: frame.midX - size.width / 2,
-                y: frame.minY + frame.height * 0.6 - size.height / 2,
-                width: size.width,
-                height: size.height
-            ), display: true)
+        placing = true
+        if let spot = placed[mode], -spot.at.timeIntervalSinceNow < Self.remember,
+           NSScreen.screens.contains(where: { $0.visibleFrame.contains(NSPoint(x: spot.origin.x + size.width / 2, y: spot.origin.y + size.height / 2)) }) {
+            panel.setFrame(NSRect(origin: spot.origin, size: size), display: true)
+            placed[mode] = (spot.origin, Date())
+        } else {
+            let mouse = NSEvent.mouseLocation
+            let screen = NSScreen.screens.first { NSMouseInRect(mouse, $0.frame, false) } ?? NSScreen.main
+            if let frame = screen?.visibleFrame {
+                panel.setFrame(NSRect(
+                    x: frame.midX - size.width / 2,
+                    y: frame.minY + frame.height * 0.6 - size.height / 2,
+                    width: size.width,
+                    height: size.height
+                ), display: true)
+            }
         }
+        placing = false
         panel.makeKeyAndOrderFront(nil)
     }
 

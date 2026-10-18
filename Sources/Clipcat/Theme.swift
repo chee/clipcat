@@ -168,6 +168,7 @@ struct Overlay<Content: View>: View {
             .padding(.horizontal, 16)
             .padding(.top, 14)
             .padding(.bottom, 10)
+            .background(DragHandle())
 
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 6) {
@@ -180,6 +181,7 @@ struct Overlay<Content: View>: View {
                 .padding(.vertical, 4)
             }
             .padding(.bottom, 8)
+            .background(DragHandle())
 
             Rule()
             content.frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -190,18 +192,52 @@ struct Overlay<Content: View>: View {
                 Spacer(minLength: 8)
                 ForEach(keys.indices, id: \.self) { keys[$0] }
             }
+            .allowsHitTesting(false) // so the whole footer drags
             .padding(.horizontal, 14)
             .padding(.vertical, 7)
+            .background(DragHandle())
             .background(Theme.cherries)
         }
         .foregroundColor(Theme.ink)
         .background(Theme.page)
         .clipShape(RoundedRectangle(cornerRadius: 4))
-        .overlay(RoundedRectangle(cornerRadius: 4).strokeBorder(Theme.ink, lineWidth: 1))
+        .overlay(DragEdges())
+        .overlay(RoundedRectangle(cornerRadius: 4).strokeBorder(Theme.ink, lineWidth: 1).allowsHitTesting(false))
         .background(RoundedRectangle(cornerRadius: 4).fill(Theme.ink).offset(x: 3, y: 3))
         .shadow(color: .black.opacity(0.18), radius: 24, y: 10)
         .padding(EdgeInsets(top: 20, leading: 30, bottom: 40, trailing: 34))
         .onAppear { DispatchQueue.main.async { focused = true } }
+    }
+}
+
+/// click and drag on this to move the window
+struct DragHandle: NSViewRepresentable {
+    final class Handle: NSView {
+        override var mouseDownCanMoveWindow: Bool { true }
+        override func mouseDown(with event: NSEvent) { window?.performDrag(with: event) }
+    }
+
+    func makeNSView(context: Context) -> NSView { Handle() }
+    func updateNSView(_ nsView: NSView, context: Context) {}
+}
+
+/// a thin draggable band round the inside of the window's edge
+struct DragEdges: View {
+    private let band: CGFloat = 6
+
+    var body: some View {
+        ZStack {
+            VStack(spacing: 0) {
+                DragHandle().frame(height: band)
+                Spacer()
+                DragHandle().frame(height: band)
+            }
+            HStack(spacing: 0) {
+                DragHandle().frame(width: band)
+                Spacer()
+                DragHandle().frame(width: band)
+            }
+        }
     }
 }
 
