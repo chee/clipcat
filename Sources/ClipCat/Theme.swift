@@ -160,7 +160,6 @@ struct Overlay<Content: View>: View {
     var body: some View {
         VStack(spacing: 0) {
             HStack(spacing: 10) {
-                Text(Theme.bunny).font(Theme.font(18)).foregroundColor(Theme.pink)
                 TextField(placeholder, text: $query)
                     .textFieldStyle(.plain)
                     .font(Theme.font(22))
