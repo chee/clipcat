@@ -3,7 +3,7 @@ import Foundation
 import SQLite3
 
 struct Clip: Identifiable, Equatable {
-    enum Kind: Int { case text = 0, image = 1, file = 2 }
+    enum Kind: Int, CaseIterable { case text = 0, image = 1, file = 2, link = 3, color = 4 }
 
     let id: Int64
     let kind: Kind
@@ -14,6 +14,18 @@ struct Clip: Identifiable, Equatable {
     let image: String?
     let created: Date
     let used: Date
+    /// the app it was copied in
+    let app: String
+    let count: Int
+    let pinned: Bool
+}
+
+/// what to look for. words match text and what vision saw; the rest narrow it down.
+struct ClipSearch {
+    var words: [String] = []
+    var kinds: [Clip.Kind]?
+    var app: String?
+    var pinnedOnly = false
 }
 
 extension Notification.Name {
@@ -29,7 +41,7 @@ final class Store {
     let imageDir: URL
     private var db: OpaquePointer?
     private let q = DispatchQueue(label: "party.chee.clipcat.store")
-    private let columns = "c.id, c.kind, c.body, c.vision, c.labels, c.image, c.created, c.used"
+    private let columns = "c.id, c.kind, c.body, c.vision, c.labels, c.image, c.created, c.used, c.app, c.count, c.pinned"
 
     private init() {
         let base = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
@@ -39,6 +51,10 @@ final class Store {
         let path = base.appendingPathComponent("clips.sqlite").path
         sqlite3_open_v2(path, &db, SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE | SQLITE_OPEN_FULLMUTEX, nil)
         sqlite3_exec(db, Self.schema, nil, nil, nil)
+        // older databases. these fail harmlessly when the column is already there.
+        for column in ["app TEXT NOT NULL DEFAULT ''", "count INTEGER NOT NULL DEFAULT 1", "pinned INTEGER NOT NULL DEFAULT 0"] {
+            sqlite3_exec(db, "ALTER TABLE clips ADD COLUMN \(column)", nil, nil, nil)
+        }
     }
 
     private static let schema = """
@@ -53,7 +69,10 @@ final class Store {
         labels TEXT NOT NULL DEFAULT '',
         image TEXT,
         created REAL NOT NULL,
-        used REAL NOT NULL
+        used REAL NOT NULL,
+        app TEXT NOT NULL DEFAULT '',
+        count INTEGER NOT NULL DEFAULT 1,
+        pinned INTEGER NOT NULL DEFAULT 0
     );
     CREATE INDEX IF NOT EXISTS clips_used ON clips(used DESC);
     CREATE VIRTUAL TABLE IF NOT EXISTS clips_fts USING fts5(
@@ -80,15 +99,15 @@ final class Store {
     /// inserts a clip, or bumps it to the top if we've seen it before.
     /// `seen` is false when vision still needs to look at it.
     @discardableResult
-    func add(_ kind: Clip.Kind, body: String, image: String? = nil, hash: String) -> (id: Int64, seen: Bool)? {
+    func add(_ kind: Clip.Kind, body: String, image: String? = nil, hash: String, app: String) -> (id: Int64, seen: Bool)? {
         q.sync { () -> (id: Int64, seen: Bool)? in
             let now = Date().timeIntervalSince1970
             var result: (id: Int64, seen: Bool)?
             self.run("""
-                INSERT INTO clips (kind, hash, body, image, created, used) VALUES (?, ?, ?, ?, ?, ?)
-                ON CONFLICT(hash) DO UPDATE SET used = excluded.used
+                INSERT INTO clips (kind, hash, body, image, created, used, app) VALUES (?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(hash) DO UPDATE SET used = excluded.used, app = excluded.app, count = count + 1
                 RETURNING id, vision IS NOT NULL
-                """, [kind.rawValue, hash, body, image, now, now]) { st in
+                """, [kind.rawValue, hash, body, image, now, now, app]) { st in
                 result = (id: sqlite3_column_int64(st, 0), seen: sqlite3_column_int(st, 1) != 0)
             }
             return result
@@ -101,6 +120,10 @@ final class Store {
 
     func touch(_ id: Int64) {
         q.sync { _ = self.run("UPDATE clips SET used = ? WHERE id = ?", [Date().timeIntervalSince1970, id]) }
+    }
+
+    func setPinned(_ id: Int64, _ pinned: Bool) {
+        q.sync { _ = self.run("UPDATE clips SET pinned = ? WHERE id = ?", [pinned ? 1 : 0, id]) }
     }
 
     func delete(_ clip: Clip) {
@@ -119,36 +142,54 @@ final class Store {
         }
     }
 
-    func search(_ query: String, limit: Int = 400) -> [Clip] {
-        q.sync { () -> [Clip] in
-            var out: [Clip] = []
-            let words = query.split(whereSeparator: { $0.isWhitespace })
-            if words.isEmpty {
-                self.run("SELECT \(self.columns) FROM clips c ORDER BY c.used DESC LIMIT ?", [limit]) { out.append(self.clip($0)) }
-                return out
+    func search(_ search: ClipSearch, limit: Int = 400) -> [Clip] {
+        var conditions: [String] = []
+        var args: [Any?] = []
+        if let kinds = search.kinds {
+            conditions.append("c.kind IN (" + kinds.map { String($0.rawValue) }.joined(separator: ", ") + ")")
+        }
+        if search.pinnedOnly { conditions.append("c.pinned = 1") }
+        if let app = search.app {
+            conditions.append("c.app LIKE ? ESCAPE '\\'")
+            args.append("%" + Self.likeEscape(app) + "%")
+        }
+
+        return q.sync { () -> [Clip] in
+            func select(_ from: String, _ extra: [String], _ extraArgs: [Any?]) -> (ok: Bool, clips: [Clip]) {
+                var out: [Clip] = []
+                let all = extra + conditions
+                let filter = all.isEmpty ? "" : "WHERE " + all.joined(separator: " AND ")
+                let ok = self.run(
+                    "SELECT \(self.columns) \(from) \(filter) ORDER BY c.pinned DESC, c.used DESC LIMIT ?",
+                    extraArgs + args + [limit]
+                ) { out.append(self.clip($0)) }
+                return (ok, out)
             }
+
+            if search.words.isEmpty { return select("FROM clips c", [], []).clips }
+
             // every word, as a prefix, anywhere in the text or in what vision saw
-            let match = words.map { "\"" + $0.replacingOccurrences(of: "\"", with: "\"\"") + "\"*" }.joined(separator: " ")
-            let ok = self.run("""
-                SELECT \(self.columns) FROM clips_fts JOIN clips c ON c.id = clips_fts.rowid
-                WHERE clips_fts MATCH ? ORDER BY c.used DESC LIMIT ?
-                """, [match, limit]) { out.append(self.clip($0)) }
-            if ok && !out.isEmpty { return out }
+            let match = search.words.map { "\"" + $0.replacingOccurrences(of: "\"", with: "\"\"") + "\"*" }
+                .joined(separator: " ")
+            let found = select("FROM clips_fts JOIN clips c ON c.id = clips_fts.rowid", ["clips_fts MATCH ?"], [match])
+            if found.ok && !found.clips.isEmpty { return found.clips }
 
             // nothing by word prefix, try plain substring
-            out = []
-            let escaped = query
-                .replacingOccurrences(of: "\\", with: "\\\\")
-                .replacingOccurrences(of: "%", with: "\\%")
-                .replacingOccurrences(of: "_", with: "\\_")
-            let like = "%" + escaped + "%"
-            self.run("""
-                SELECT \(self.columns) FROM clips c
-                WHERE c.body LIKE ? ESCAPE '\\' OR c.vision LIKE ? ESCAPE '\\' OR c.labels LIKE ? ESCAPE '\\'
-                ORDER BY c.used DESC LIMIT ?
-                """, [like, like, like, limit]) { out.append(self.clip($0)) }
-            return out
+            var extra: [String] = []
+            var extraArgs: [Any?] = []
+            for word in search.words {
+                extra.append("(c.body LIKE ? ESCAPE '\\' OR c.vision LIKE ? ESCAPE '\\' OR c.labels LIKE ? ESCAPE '\\')")
+                let like = "%" + Self.likeEscape(word) + "%"
+                extraArgs += [like, like, like]
+            }
+            return select("FROM clips c", extra, extraArgs).clips
         }
+    }
+
+    private static func likeEscape(_ s: String) -> String {
+        s.replacingOccurrences(of: "\\", with: "\\\\")
+            .replacingOccurrences(of: "%", with: "\\%")
+            .replacingOccurrences(of: "_", with: "\\_")
     }
 
     // MARK: sqlite bits
@@ -196,7 +237,25 @@ final class Store {
             labels: string(st, 4),
             image: optional(st, 5),
             created: Date(timeIntervalSince1970: sqlite3_column_double(st, 6)),
-            used: Date(timeIntervalSince1970: sqlite3_column_double(st, 7))
+            used: Date(timeIntervalSince1970: sqlite3_column_double(st, 7)),
+            app: string(st, 8),
+            count: Int(sqlite3_column_int(st, 9)),
+            pinned: sqlite3_column_int(st, 10) != 0
         )
+    }
+}
+
+/// a "#rrggbb"-ish string, as 0...1 components
+enum Hex {
+    static func parse(_ string: String) -> (r: Double, g: Double, b: Double, a: Double)? {
+        let t = string.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard t.hasPrefix("#") else { return nil }
+        var digits = String(t.dropFirst())
+        guard [3, 4, 6, 8].contains(digits.count), digits.allSatisfy(\.isHexDigit) else { return nil }
+        if digits.count <= 4 { digits = digits.map { "\($0)\($0)" }.joined() }
+        if digits.count == 6 { digits += "ff" }
+        guard let v = UInt64(digits, radix: 16) else { return nil }
+        func c(_ shift: UInt64) -> Double { Double((v >> shift) & 0xFF) / 255 }
+        return (c(24), c(16), c(8), c(0))
     }
 }

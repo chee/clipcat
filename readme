@@ -2,6 +2,15 @@ a macos launchctl background app that provides a keybinding for a fast, cute, mi
 
 ₍ᐢ•ﻌ•ᐢ₎
 
+## look
+
+a raycast-style overlay: it floats over whatever you're doing, takes the
+keyboard without stealing focus, and goes away when you're done.
+
+iosevka rabbits (bundled), thin black lines, tiny corners, hard little
+shadows that grow when something is picked, cream and cherries, hot pink
+(#e34685) for the picked thing, and things fading in one after another.
+
 ## keys
 
 - ⌃⌘V  clipboard
@@ -9,18 +18,29 @@ a macos launchctl background app that provides a keybinding for a fast, cute, mi
 
 in the clipboard:
 
-- type to search. words are matched as prefixes against the text, and against
-  whatever vision read or saw in pictures
+- type to search. every word is matched as a prefix against the text, and
+  against whatever vision read or saw in pictures. if nothing matches that
+  way it falls back to plain substring search
+- `@app` in the search narrows to things copied in that app (`@safari pasta`)
+- ⇥ / ⇧⇥  filter: all, pinned, text, links, pictures, files, colours
+  (or click the chips)
 - ↑ ↓  move
 - ↩  paste into the app you were in
 - ⌘↩  copy only
 - ⌘1–9  paste that one
+- ⌘P  pin. pinned clips stay at the top
+- ⌘O  open the link, or show the file or picture in finder
 - ⌘⌫  forget it
 - esc  close
+
+the preview on the right shows the whole thing (picture, swatch, link, file
+icons, text) and where it came from, how big it is, how many times it's been
+used, and when.
 
 in emoji:
 
 - type to search by name ("sob", "flag japan", "bunny")
+- ⇥ / ⇧⇥  filter: all, recent, faces, people, nature, food, things, flags
 - ← → ↑ ↓  move
 - ↩  type it into the app you were in (doesn't touch the clipboard)
 - ⌘↩  copy only
@@ -63,6 +83,9 @@ the keybindings themselves need no permission.
   show (`VNClassifyImageRequest`), in the background, and that goes in the
   index too. thumbnails are decoded small and cached.
 - **files** copied in finder are remembered as paths and paste back as files.
+- **links and colours** are text, but get spotted when copied (a lone url;
+  `#rgb`/`#rrggbb`, `rgb()`, `oklch()` and friends) so they can be filtered
+  and previewed.
 - **secrets** marked concealed or transient on the pasteboard (password
   managers do this) are skipped.
 - **watching** is one integer read every 0.4s (`NSPasteboard.changeCount`).

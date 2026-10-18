@@ -29,22 +29,41 @@ final class Watcher {
     private func capture(_ pb: NSPasteboard) {
         let types = Set((pb.types ?? []).map(\.rawValue))
         guard types.isDisjoint(with: Self.secret) else { return }
+        let app = NSWorkspace.shared.frontmostApplication?.localizedName ?? ""
 
         if let urls = pb.readObjects(forClasses: [NSURL.self], options: [.urlReadingFileURLsOnly: true]) as? [URL],
            !urls.isEmpty {
             let body = urls.map(\.path).joined(separator: "\n")
-            Store.shared.add(.file, body: body, hash: "f:" + Store.hash(Data(body.utf8)))
+            Store.shared.add(.file, body: body, hash: "f:" + Store.hash(Data(body.utf8)), app: app)
             changed()
         } else if let text = pb.string(forType: .string),
                   !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-            Store.shared.add(.text, body: text, hash: "t:" + Store.hash(Data(text.utf8)))
+            Store.shared.add(Self.kind(of: text), body: text, hash: "t:" + Store.hash(Data(text.utf8)), app: app)
             changed()
         } else if let data = pb.data(forType: .png) ?? pb.data(forType: .tiff) {
-            work.async { [weak self] in self?.keep(image: data) }
+            work.async { [weak self] in self?.keep(image: data, app: app) }
         }
     }
 
-    private func keep(image data: Data) {
+    /// links and colours are text too, but they get their own filter and preview
+    static func kind(of text: String) -> Clip.Kind {
+        let t = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        if t.count < 4096, !t.contains(where: { $0.isWhitespace }) {
+            if let url = URL(string: t), let scheme = url.scheme?.lowercased(),
+               (["http", "https", "ftp"].contains(scheme) && url.host != nil) || scheme == "mailto" {
+                return .link
+            }
+            if t.lowercased().hasPrefix("www.") { return .link }
+        }
+        if Hex.parse(t) != nil { return .color }
+        if t.count < 80,
+           t.range(of: #"^(rgba?|hsla?|hwb|lab|lch|oklab|oklch)\([^)]*\)$"#, options: [.regularExpression, .caseInsensitive]) != nil {
+            return .color
+        }
+        return .text
+    }
+
+    private func keep(image data: Data, app: String) {
         let isPNG = data.starts(with: [0x89, 0x50, 0x4E, 0x47])
         guard let png = isPNG ? data : NSBitmapImageRep(data: data)?.representation(using: .png, properties: [:])
         else { return }
@@ -53,7 +72,7 @@ final class Watcher {
         if !FileManager.default.fileExists(atPath: url.path) {
             try? png.write(to: url, options: .atomic)
         }
-        if let added = Store.shared.add(.image, body: "", image: url.path, hash: "i:" + hash), !added.seen {
+        if let added = Store.shared.add(.image, body: "", image: url.path, hash: "i:" + hash, app: app), !added.seen {
             Seer.look(at: url.path, id: added.id)
         }
         DispatchQueue.main.async { self.changed() }

@@ -46,11 +46,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         switch mode {
         case .clips:
             watcher.check()
+            clips.filter = .all
             clips.query = ""
-            panel.show(.clips, ClipsView(model: clips), size: CGSize(width: 820, height: 520), keys: clips.handle)
+            panel.show(.clips, ClipsView(model: clips), size: CGSize(width: 924, height: 600), keys: clips.handle)
         case .emoji:
+            emoji.filter = .all
             emoji.query = ""
-            panel.show(.emoji, EmojiView(model: emoji), size: CGSize(width: 540, height: 480), keys: emoji.handle)
+            panel.show(.emoji, EmojiView(model: emoji), size: CGSize(width: 616, height: 580), keys: emoji.handle)
         }
     }
 

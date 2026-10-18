@@ -14,6 +14,8 @@ bundle: build
 	mkdir -p build/$(APP)/Contents/MacOS
 	cp .build/release/ClipCat build/$(APP)/Contents/MacOS/ClipCat
 	cp support/Info.plist build/$(APP)/Contents/Info.plist
+	mkdir -p build/$(APP)/Contents/Resources
+	cp -R support/fonts build/$(APP)/Contents/Resources/fonts
 	codesign --force --sign - --identifier $(LABEL) build/$(APP)
 
 install: bundle

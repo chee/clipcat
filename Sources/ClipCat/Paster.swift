@@ -21,14 +21,36 @@ enum Paster {
         let pb = NSPasteboard.general
         pb.clearContents()
         switch clip.kind {
-        case .text:
+        case .text, .color:
             pb.setString(clip.body, forType: .string)
+        case .link:
+            pb.setString(clip.body, forType: .string)
+            if let url = URL(string: clip.body.trimmingCharacters(in: .whitespacesAndNewlines)) {
+                pb.setString(url.absoluteString, forType: .URL)
+            }
         case .file:
             pb.writeObjects(clip.body.split(separator: "\n").map { NSURL(fileURLWithPath: String($0)) })
         case .image:
             guard let path = clip.image, let data = FileManager.default.contents(atPath: path) else { return }
             pb.setData(data, forType: .png)
             if let tiff = NSImage(data: data)?.tiffRepresentation { pb.setData(tiff, forType: .tiff) }
+        }
+    }
+
+    /// links in the browser, files and pictures in finder
+    static func open(_ clip: Clip) {
+        switch clip.kind {
+        case .link:
+            var text = clip.body.trimmingCharacters(in: .whitespacesAndNewlines)
+            if text.lowercased().hasPrefix("www.") { text = "https://" + text }
+            if let url = URL(string: text) { NSWorkspace.shared.open(url) }
+        case .file:
+            let urls = clip.body.split(separator: "\n").map { URL(fileURLWithPath: String($0)) }
+            NSWorkspace.shared.activateFileViewerSelecting(urls)
+        case .image:
+            if let path = clip.image { NSWorkspace.shared.activateFileViewerSelecting([URL(fileURLWithPath: path)]) }
+        case .text, .color:
+            break
         }
     }
 
