@@ -109,11 +109,7 @@ struct SettingsView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
-            HStack(spacing: 10) {
-                Text(Theme.bunny).foregroundColor(Theme.pink)
-                Text("shortcuts")
-            }
-            .font(Theme.font(18))
+            Text("shortcuts").font(Theme.font(18))
 
             row("clipboard", .clips)
             row("emoji", .emoji)

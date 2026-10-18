@@ -31,7 +31,6 @@ enum Theme {
         return .system(size: size, weight: weight, design: .monospaced)
     }
 
-    static let bunny = "₍ᐢ•ﻌ•ᐢ₎"
 }
 
 extension Color {
