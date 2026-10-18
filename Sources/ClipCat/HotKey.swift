@@ -6,10 +6,11 @@ final class HotKey {
     private static var nextID: UInt32 = 1
     private static var installed = false
     private var ref: EventHotKeyRef?
+    private let id: UInt32
 
     init(keyCode: UInt32, modifiers: UInt32, _ action: @escaping () -> Void) {
         Self.install()
-        let id = Self.nextID
+        id = Self.nextID
         Self.nextID += 1
         Self.actions[id] = action
         let hotKeyID = EventHotKeyID(signature: OSType(0x434C_4354), id: id) // 'CLCT'
@@ -18,6 +19,7 @@ final class HotKey {
 
     deinit {
         if let ref { UnregisterEventHotKey(ref) }
+        Self.actions[id] = nil
     }
 
     private static func install() {

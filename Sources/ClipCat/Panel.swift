@@ -37,6 +37,7 @@ final class PanelController {
     private(set) var previous: NSRunningApplication?
     private var keys: ((NSEvent) -> Bool)?
     private var monitor: Any?
+    var onSettings: (() -> Void)?
 
     /// there's no edit menu in a menu bar app, so do the text field shortcuts by hand
     private static let edits: [String: Selector] = [
@@ -52,6 +53,12 @@ final class PanelController {
             guard let self, event.window === self.panel else { return event }
             if event.keyCode == 53 { // esc
                 self.hide()
+                return nil
+            }
+            let flags = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
+            if flags == .command, event.charactersIgnoringModifiers == "," {
+                self.hide()
+                self.onSettings?()
                 return nil
             }
             if self.keys?(event) == true { return nil }

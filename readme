@@ -13,8 +13,10 @@ shadows that grow when something is picked, cream and cherries, hot pink
 
 ## keys
 
-- ⌃⌘V  clipboard
+- ⌃⌘C  clipboard
 - ⌃⌘E  emoji
+- ⌘,  (with either open) change those two. click one, press the new keys.
+  it needs ⌃, ⌥ or ⌘ in it. esc cancels. also in the menu bar as "shortcuts…"
 
 in the clipboard:
 

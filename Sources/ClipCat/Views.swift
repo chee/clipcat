@@ -102,6 +102,7 @@ struct ClipsView: View {
                 Keycap(key: "⌘O", label: "open"),
                 Keycap(key: "⌘⌫", label: "forget"),
                 Keycap(key: "⇥", label: "filter"),
+                Keycap(key: "⌘,", label: "keys"),
             ]
         ) {
             HStack(spacing: 0) {
@@ -310,6 +311,7 @@ struct EmojiView: View {
                 Keycap(key: "↩", label: "type"),
                 Keycap(key: "⌘↩", label: "copy"),
                 Keycap(key: "⇥", label: "filter"),
+                Keycap(key: "⌘,", label: "keys"),
             ]
         ) {
             ScrollViewReader { proxy in

@@ -7,6 +7,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private let clips = ClipModel()
     private let emoji = EmojiModel()
     private var hotKeys: [HotKey] = []
+    private let shortcuts = Shortcuts()
+    private lazy var settings = SettingsWindow(shortcuts: shortcuts)
     private var status: NSStatusItem?
     private var activity: NSObjectProtocol?
 
@@ -23,11 +25,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         clips.onPick = { [weak self] clip, paste in self?.pick(clip, paste: paste) }
         emoji.onPick = { [weak self] emoji, type in self?.pick(emoji, type: type) }
 
-        let mods = UInt32(cmdKey | controlKey)
-        hotKeys = [
-            HotKey(keyCode: UInt32(kVK_ANSI_V), modifiers: mods) { [weak self] in self?.toggle(.clips) },
-            HotKey(keyCode: UInt32(kVK_ANSI_E), modifiers: mods) { [weak self] in self?.toggle(.emoji) },
-        ]
+        shortcuts.onChange = { [weak self] in self?.bindKeys() }
+        // let go of the hotkeys while recording, or they'd swallow the very keys being pressed
+        shortcuts.onRecording = { [weak self] recording in
+            if recording { self?.hotKeys = [] } else { self?.bindKeys() }
+        }
+        panel.onSettings = { [weak self] in self?.settings.show() }
+        bindKeys()
 
         NotificationCenter.default.addObserver(forName: .clipsChanged, object: nil, queue: .main) { [weak self] _ in
             guard let self, self.panel.isShowing(.clips) else { return }
@@ -36,6 +40,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         if !UserDefaults.standard.bool(forKey: "hideMenuBarIcon") { setUpStatus() }
         Paster.askForAccess()
+    }
+
+    private func bindKeys() {
+        let clips = shortcuts.clips
+        let emoji = shortcuts.emoji
+        hotKeys = []
+        hotKeys = [
+            HotKey(keyCode: clips.keyCode, modifiers: clips.modifiers) { [weak self] in self?.toggle(.clips) },
+            HotKey(keyCode: emoji.keyCode, modifiers: emoji.modifiers) { [weak self] in self?.toggle(.emoji) },
+        ]
+        updateMenu()
     }
 
     private func toggle(_ mode: PanelController.Mode) {
@@ -76,19 +91,26 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private func setUpStatus() {
         let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
         item.button?.image = NSImage(systemSymbolName: "hare.fill", accessibilityDescription: "clipcat")
+        status = item
+        updateMenu()
+    }
+
+    private func updateMenu() {
+        guard let item = status else { return }
         let menu = NSMenu()
-        menu.addItem(withTitle: "clipboard  ⌃⌘V", action: #selector(showClips), keyEquivalent: "").target = self
-        menu.addItem(withTitle: "emoji  ⌃⌘E", action: #selector(showEmoji), keyEquivalent: "").target = self
+        menu.addItem(withTitle: "clipboard  " + shortcuts.clips.label, action: #selector(showClips), keyEquivalent: "").target = self
+        menu.addItem(withTitle: "emoji  " + shortcuts.emoji.label, action: #selector(showEmoji), keyEquivalent: "").target = self
         menu.addItem(.separator())
+        menu.addItem(withTitle: "shortcuts…", action: #selector(showSettings), keyEquivalent: ",").target = self
         if !Paster.trusted {
             menu.addItem(withTitle: "allow pasting…", action: #selector(allowPasting), keyEquivalent: "").target = self
         }
         menu.addItem(withTitle: "quit clipcat", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
         item.menu = menu
-        status = item
     }
 
     @objc private func showClips() { toggle(.clips) }
     @objc private func showEmoji() { toggle(.emoji) }
+    @objc private func showSettings() { settings.show() }
     @objc private func allowPasting() { Paster.openAccessSettings() }
 }
