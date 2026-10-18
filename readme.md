@@ -1,7 +1,10 @@
-macos app that provides
-overlay cute fast, cute, clipboard manager with history searchable images ⌃⌘C
-overlay cute fast, cute  emoji search filter ⌃⌘E
-=^.^=
+# clip cat
+
+macos app
+
+- overlay cute fast, cute, clipboard manager with history searchable images ⌃⌘C
+- overlay cute fast, cute  emoji search filter ⌃⌘E
+- =^.^=
 
 ![clipcat's clipboard overlay](screenshot.webp)
 
