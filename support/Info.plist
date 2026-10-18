@@ -8,6 +8,8 @@
 	<string>Clipcat</string>
 	<key>CFBundleExecutable</key>
 	<string>Clipcat</string>
+	<key>CFBundleIconFile</key>
+	<string>Clipcat</string>
 	<key>CFBundlePackageType</key>
 	<string>APPL</string>
 	<key>CFBundleShortVersionString</key>

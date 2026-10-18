@@ -23,6 +23,7 @@ bundle: build
 	cp support/Info.plist build/$(APP)/Contents/Info.plist
 	mkdir -p build/$(APP)/Contents/Resources
 	cp -R support/fonts build/$(APP)/Contents/Resources/fonts
+	cp support/Clipcat.icns build/$(APP)/Contents/Resources/Clipcat.icns
 	@case "$(SIGN)" in \
 	"Developer ID Application:"*) codesign --force --options runtime --timestamp --identifier $(LABEL) --sign "$(SIGN)" build/$(APP) ;; \
 	*) codesign --force --identifier $(LABEL) --sign "$(SIGN)" build/$(APP) ;; \
