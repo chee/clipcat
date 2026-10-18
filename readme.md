@@ -102,7 +102,8 @@ the keybindings themselves need no permission.
 
 ## settings
 
-⌘, in either overlay opens the settings: the two shortcuts, and a `=^.^=` in
-the menu bar (off to begin with).
+⌘, in either overlay opens the settings: the two shortcuts, start at login
+(on after `make install`; it's the launch agent), and a `=^.^=` in the menu
+bar (off to begin with).
 
 with no icon, quit with `launchctl bootout gui/$(id -u)/party.chee.clipcat`.

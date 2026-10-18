@@ -61,6 +61,9 @@ final class Shortcuts: ObservableObject {
             onMenuBarIcon?(menuBarIcon)
         }
     }
+    @Published var startAtLogin: Bool {
+        didSet { LaunchAgent.set(startAtLogin) }
+    }
     var onChange: (() -> Void)?
     var onRecording: ((Bool) -> Void)?
     var onMenuBarIcon: ((Bool) -> Void)?
@@ -69,6 +72,7 @@ final class Shortcuts: ObservableObject {
         clips = Self.load(.clips) ?? .clips
         emoji = Self.load(.emoji) ?? .emoji
         menuBarIcon = UserDefaults.standard.bool(forKey: "showMenuBarIcon")
+        startAtLogin = LaunchAgent.enabled
     }
 
     subscript(which: Which) -> Shortcut {
@@ -136,6 +140,13 @@ struct SettingsView: View {
             }
 
             HStack {
+                Text("start at login").font(Theme.font(14))
+                Spacer()
+                button(shortcuts.startAtLogin ? "on" : "off", on: shortcuts.startAtLogin)
+                    .onTapGesture { shortcuts.startAtLogin.toggle() }
+            }
+
+            HStack {
                 Text("menu bar icon").font(Theme.font(14))
                 Spacer()
                 button(shortcuts.menuBarIcon ? "on" : "off", on: shortcuts.menuBarIcon)
@@ -167,6 +178,39 @@ struct SettingsView: View {
             .frame(minWidth: 120)
             .boxy(on ? Theme.pink : Theme.card, line: on ? Theme.pinkDark : Theme.ink, lifted: on)
             .contentShape(Rectangle())
+    }
+}
+
+/// the launch agent `make install` writes. turning it off removes it; turning it on
+/// writes it again, pointing at this copy of the app. launchd picks it up at login.
+enum LaunchAgent {
+    static let label = "party.chee.clipcat"
+
+    static var url: URL {
+        FileManager.default.homeDirectoryForCurrentUser
+            .appendingPathComponent("Library/LaunchAgents/\(label).plist")
+    }
+
+    static var enabled: Bool {
+        (NSDictionary(contentsOf: url)?["RunAtLoad"] as? Bool) ?? false
+    }
+
+    static func set(_ on: Bool) {
+        guard on else {
+            try? FileManager.default.removeItem(at: url)
+            return
+        }
+        guard let executable = Bundle.main.executablePath else { return }
+        let plist: NSDictionary = [
+            "Label": label,
+            "ProgramArguments": [executable],
+            "RunAtLoad": true,
+            "KeepAlive": ["SuccessfulExit": false],
+            "ProcessType": "Interactive",
+            "LimitLoadToSessionType": "Aqua",
+        ]
+        try? FileManager.default.createDirectory(at: url.deletingLastPathComponent(), withIntermediateDirectories: true)
+        _ = plist.write(to: url, atomically: true)
     }
 }
 
