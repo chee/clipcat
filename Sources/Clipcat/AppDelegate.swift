@@ -20,6 +20,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         )
         watcher.start()
         Seer.catchUp()
+        Housekeeping.start()
         DispatchQueue.main.async { [emoji] in emoji.warm() }
 
         clips.onPick = { [weak self] clip, paste in self?.pick(clip, paste: paste) }

@@ -45,7 +45,7 @@ final class PanelController {
     private static let remember: TimeInterval = 10 * 60
 
     /// there's no edit menu in a menu bar app, so do the text field shortcuts by hand
-    private static let edits: [String: Selector] = [
+    static let edits: [String: Selector] = [
         "a": #selector(NSText.selectAll(_:)),
         "c": #selector(NSText.copy(_:)),
         "v": #selector(NSText.paste(_:)),

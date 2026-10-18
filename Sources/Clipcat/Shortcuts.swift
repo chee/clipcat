@@ -119,54 +119,139 @@ final class Shortcuts: ObservableObject {
 
 struct SettingsView: View {
     @ObservedObject var shortcuts: Shortcuts
+    @ObservedObject var history: HistorySettings
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 14) {
+        VStack(alignment: .leading, spacing: 12) {
             Text("settings").font(Theme.font(18))
 
+            heading("shortcuts")
             row("clipboard", .clips)
             row("emoji", .emoji)
-
-            Text(shortcuts.recording == nil
-                 ? "click one, then press the new keys."
-                 : "press the new keys. needs ⌃, ⌥ or ⌘. esc to cancel.")
-                .font(Theme.font(11))
-                .foregroundColor(Theme.quiet)
-
             HStack {
+                Text(shortcuts.recording == nil
+                     ? "click one, then press the new keys."
+                     : "press the new keys. needs ⌃, ⌥ or ⌘. esc to cancel.")
+                    .font(Theme.font(11))
+                    .foregroundColor(Theme.quiet)
                 Spacer()
-                Chip(text: "reset")
-                    .onTapGesture { shortcuts.reset() }
+                Chip(text: "reset").onTapGesture { shortcuts.reset() }
             }
 
+            heading("history", "\(history.count) clips · \(HistorySettings.size(history.bytes))")
+            HStack(spacing: 6) {
+                label("keep")
+                Chip(text: "forever", on: history.draft.keep == nil)
+                    .onTapGesture { history.draft.keep = nil }
+                ForEach(Age.allCases, id: \.self) { age in
+                    Chip(text: age.label, on: history.draft.keep == age)
+                        .onTapGesture { history.draft.keep = age }
+                }
+            }
+            HStack(spacing: 6) {
+                label("at most")
+                number($history.draft.maxItems)
+                Text("clips").font(Theme.font(12))
+                Spacer().frame(width: 10)
+                number($history.draft.maxMB)
+                Text("MB").font(Theme.font(12))
+            }
             HStack {
-                Text("start at login").font(Theme.font(14))
+                Text("pinned clips are always kept.")
+                    .font(Theme.font(11))
+                    .foregroundColor(Theme.quiet)
+                Spacer()
+                if history.draft != history.saved {
+                    button(history.draftDeletes > 0 ? "save · deletes \(history.draftDeletes)" : "save", on: true)
+                        .onTapGesture { history.save() }
+                }
+            }
+
+            heading("clean up now")
+            HStack(spacing: 6) {
+                label("older than")
+                ForEach(Age.allCases, id: \.self) { age in
+                    Chip(text: age.label, on: history.cleanAge == age)
+                        .onTapGesture { history.cleanAge = age }
+                }
+            }
+            HStack(spacing: 6) {
+                label("at least")
+                ForEach(MinSize.allCases, id: \.self) { size in
+                    Chip(text: size.label, on: history.cleanSize == size)
+                        .onTapGesture { history.cleanSize = size }
+                }
+            }
+            HStack {
+                Spacer()
+                button(
+                    history.cleanCount == 0
+                        ? "nothing to delete"
+                        : history.armed
+                        ? "really delete \(history.cleanCount)? click again"
+                        : "delete \(history.cleanCount) clips · \(HistorySettings.size(history.cleanBytes))",
+                    on: history.armed
+                )
+                .opacity(history.cleanCount == 0 ? 0.5 : 1)
+                .onTapGesture { history.clean() }
+            }
+
+            heading("app")
+            HStack {
+                label("start at login")
                 Spacer()
                 button(shortcuts.startAtLogin ? "on" : "off", on: shortcuts.startAtLogin)
                     .onTapGesture { shortcuts.startAtLogin.toggle() }
             }
-
             HStack {
-                Text("menu bar icon").font(Theme.font(14))
+                label("menu bar icon")
                 Spacer()
                 button(shortcuts.menuBarIcon ? "on" : "off", on: shortcuts.menuBarIcon)
                     .onTapGesture { shortcuts.menuBarIcon.toggle() }
             }
         }
         .padding(20)
-        .frame(width: 360)
+        .frame(width: 480)
         .foregroundColor(Theme.ink)
         .background(Theme.page)
+    }
+
+    private func heading(_ title: String, _ detail: String = "") -> some View {
+        HStack(alignment: .firstTextBaseline) {
+            Text(title).font(Theme.font(12, .bold)).foregroundColor(Theme.pink)
+            Spacer()
+            Text(detail).font(Theme.font(11)).foregroundColor(Theme.quiet)
+        }
+        .padding(.top, 6)
+    }
+
+    private func label(_ text: String) -> some View {
+        Text(text).font(Theme.font(13)).frame(width: 84, alignment: .leading)
     }
 
     private func row(_ title: String, _ which: Shortcuts.Which) -> some View {
         let on = shortcuts.recording == which
         return HStack {
-            Text(title).font(Theme.font(14))
+            label(title)
             Spacer()
             button(on ? "press keys…" : shortcuts[which].label, on: on)
                 .onTapGesture { shortcuts.recording = on ? nil : which }
         }
+    }
+
+    /// empty means no limit
+    private func number(_ value: Binding<Int?>) -> some View {
+        TextField("∞", text: Binding(
+            get: { value.wrappedValue.map(String.init) ?? "" },
+            set: { text in value.wrappedValue = Int(text.filter(\.isNumber)).flatMap { $0 > 0 ? $0 : nil } }
+        ))
+        .textFieldStyle(.plain)
+        .font(Theme.font(13))
+        .multilineTextAlignment(.trailing)
+        .padding(.horizontal, 6)
+        .padding(.vertical, 3)
+        .frame(width: 80)
+        .boxy(Theme.card)
     }
 
     private func button(_ text: String, on: Bool) -> some View {
@@ -219,6 +304,7 @@ final class SettingsWindow {
     private var window: NSWindow?
     private var monitor: Any?
     private let shortcuts: Shortcuts
+    private let history = HistorySettings()
 
     init(shortcuts: Shortcuts) {
         self.shortcuts = shortcuts
@@ -227,6 +313,11 @@ final class SettingsWindow {
             if self.shortcuts.record(event) { return nil }
             if event.keyCode == 53 || (event.modifierFlags.contains(.command) && event.charactersIgnoringModifiers == "w") {
                 window.close()
+                return nil
+            }
+            if event.modifierFlags.intersection(.deviceIndependentFlagsMask) == .command,
+               let ch = event.charactersIgnoringModifiers, let action = PanelController.edits[ch] {
+                NSApp.sendAction(action, to: nil, from: nil)
                 return nil
             }
             return event
@@ -243,7 +334,7 @@ final class SettingsWindow {
             )
             window.title = "clipcat"
             window.isReleasedWhenClosed = false
-            let host = NSHostingView(rootView: SettingsView(shortcuts: shortcuts))
+            let host = NSHostingView(rootView: SettingsView(shortcuts: shortcuts, history: history))
             window.contentView = host
             window.setContentSize(host.fittingSize)
             window.center()
@@ -252,6 +343,7 @@ final class SettingsWindow {
             ) { [weak self] _ in self?.shortcuts.recording = nil }
             self.window = window
         }
+        history.reload()
         NSApp.activate(ignoringOtherApps: true)
         window?.makeKeyAndOrderFront(nil)
     }

@@ -72,7 +72,7 @@ final class Watcher {
         if !FileManager.default.fileExists(atPath: url.path) {
             try? png.write(to: url, options: .atomic)
         }
-        if let added = Store.shared.add(.image, body: "", image: url.path, hash: "i:" + hash, app: app), !added.seen {
+        if let added = Store.shared.add(.image, body: "", image: url.path, bytes: png.count, hash: "i:" + hash, app: app), !added.seen {
             Seer.look(at: url.path, id: added.id)
         }
         DispatchQueue.main.async { self.changed() }

@@ -52,7 +52,8 @@ final class Store {
         sqlite3_open_v2(path, &db, SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE | SQLITE_OPEN_FULLMUTEX, nil)
         sqlite3_exec(db, Self.schema, nil, nil, nil)
         // older databases. these fail harmlessly when the column is already there.
-        for column in ["app TEXT NOT NULL DEFAULT ''", "count INTEGER NOT NULL DEFAULT 1", "pinned INTEGER NOT NULL DEFAULT 0"] {
+        for column in ["app TEXT NOT NULL DEFAULT ''", "count INTEGER NOT NULL DEFAULT 1", "pinned INTEGER NOT NULL DEFAULT 0",
+                       "bytes INTEGER NOT NULL DEFAULT 0"] {
             sqlite3_exec(db, "ALTER TABLE clips ADD COLUMN \(column)", nil, nil, nil)
         }
     }
@@ -72,7 +73,8 @@ final class Store {
         used REAL NOT NULL,
         app TEXT NOT NULL DEFAULT '',
         count INTEGER NOT NULL DEFAULT 1,
-        pinned INTEGER NOT NULL DEFAULT 0
+        pinned INTEGER NOT NULL DEFAULT 0,
+        bytes INTEGER NOT NULL DEFAULT 0
     );
     CREATE INDEX IF NOT EXISTS clips_used ON clips(used DESC);
     CREATE VIRTUAL TABLE IF NOT EXISTS clips_fts USING fts5(
@@ -99,15 +101,15 @@ final class Store {
     /// inserts a clip, or bumps it to the top if we've seen it before.
     /// `seen` is false when vision still needs to look at it.
     @discardableResult
-    func add(_ kind: Clip.Kind, body: String, image: String? = nil, hash: String, app: String) -> (id: Int64, seen: Bool)? {
+    func add(_ kind: Clip.Kind, body: String, image: String? = nil, bytes: Int? = nil, hash: String, app: String) -> (id: Int64, seen: Bool)? {
         q.sync { () -> (id: Int64, seen: Bool)? in
             let now = Date().timeIntervalSince1970
             var result: (id: Int64, seen: Bool)?
             self.run("""
-                INSERT INTO clips (kind, hash, body, image, created, used, app) VALUES (?, ?, ?, ?, ?, ?, ?)
+                INSERT INTO clips (kind, hash, body, image, created, used, app, bytes) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                 ON CONFLICT(hash) DO UPDATE SET used = excluded.used, app = excluded.app, count = count + 1
                 RETURNING id, vision IS NOT NULL
-                """, [kind.rawValue, hash, body, image, now, now, app]) { st in
+                """, [kind.rawValue, hash, body, image, now, now, app, bytes ?? body.utf8.count]) { st in
                 result = (id: sqlite3_column_int64(st, 0), seen: sqlite3_column_int(st, 1) != 0)
             }
             return result
@@ -129,6 +131,73 @@ final class Store {
     func delete(_ clip: Clip) {
         q.sync { _ = self.run("DELETE FROM clips WHERE id = ?", [clip.id]) }
         if let path = clip.image { try? FileManager.default.removeItem(atPath: path) }
+    }
+
+    /// one row per unpinned clip, newest first: what housekeeping needs to decide what goes
+    struct Row {
+        let id: Int64
+        let image: String?
+        let bytes: Int
+        let used: Date
+    }
+
+    func rows() -> [Row] {
+        q.sync { () -> [Row] in
+            var out: [Row] = []
+            self.run("SELECT id, image, bytes, used FROM clips WHERE pinned = 0 ORDER BY used DESC", []) { st in
+                out.append(Row(
+                    id: sqlite3_column_int64(st, 0),
+                    image: self.optional(st, 1),
+                    bytes: Int(sqlite3_column_int64(st, 2)),
+                    used: Date(timeIntervalSince1970: sqlite3_column_double(st, 3))
+                ))
+            }
+            return out
+        }
+    }
+
+    /// how many clips there are, and how much room they take
+    func totals() -> (count: Int, bytes: Int) {
+        q.sync { () -> (count: Int, bytes: Int) in
+            var result = (count: 0, bytes: 0)
+            self.run("SELECT count(*), coalesce(sum(bytes), 0) FROM clips", []) { st in
+                result = (count: Int(sqlite3_column_int64(st, 0)), bytes: Int(sqlite3_column_int64(st, 1)))
+            }
+            return result
+        }
+    }
+
+    func delete(_ rows: [Row]) {
+        guard !rows.isEmpty else { return }
+        q.sync {
+            self.run("BEGIN", [])
+            for chunk in stride(from: 0, to: rows.count, by: 500).map({ rows[$0..<min($0 + 500, rows.count)] }) {
+                self.run("DELETE FROM clips WHERE id IN (" + chunk.map { String($0.id) }.joined(separator: ",") + ")", [])
+            }
+            self.run("COMMIT", [])
+        }
+        for path in rows.compactMap(\.image) { try? FileManager.default.removeItem(atPath: path) }
+    }
+
+    /// gives the disk space back after a big delete
+    func vacuum() {
+        q.sync { _ = self.run("VACUUM", []) }
+    }
+
+    /// clips from before sizes were kept. text is measured in sql, pictures by their file.
+    func measure() {
+        let pictures = q.sync { () -> [(id: Int64, path: String)] in
+            self.run("UPDATE clips SET bytes = length(CAST(body AS BLOB)) WHERE bytes = 0 AND kind != 1", [])
+            var out: [(id: Int64, path: String)] = []
+            self.run("SELECT id, image FROM clips WHERE bytes = 0 AND kind = 1 AND image IS NOT NULL", []) { st in
+                out.append((id: sqlite3_column_int64(st, 0), path: self.string(st, 1)))
+            }
+            return out
+        }
+        for picture in pictures {
+            let size = (try? FileManager.default.attributesOfItem(atPath: picture.path))?[.size] as? Int
+            q.sync { _ = self.run("UPDATE clips SET bytes = ? WHERE id = ?", [size ?? 1, picture.id]) }
+        }
     }
 
     /// pictures vision hasn't looked at yet (eg. the app quit mid-look)
