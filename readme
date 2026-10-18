@@ -68,9 +68,10 @@ stops it and removes the app and the launch agent. history stays in
 
 pasting and typing into other apps sends key presses, so macos asks for
 accessibility access the first time. without it, ↩ still copies and you
-press ⌘V yourself. the app is signed ad hoc, so after a rebuild you might
-need to toggle it off and on again in system settings → privacy & security
-→ accessibility.
+press ⌘V yourself. the app is signed with your keychain's apple development
+identity (else developer id, else ad hoc), so the grant survives rebuilds; set
+CLIPCAT_SIGN to pick another. if it ends up ad hoc, you might need to toggle it
+off and on again in system settings → privacy & security → accessibility.
 
 the keybindings themselves need no permission.
 

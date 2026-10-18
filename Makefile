@@ -4,6 +4,13 @@ PREFIX ?= $(HOME)/Applications
 AGENT  = $(HOME)/Library/LaunchAgents/$(LABEL).plist
 BIN    = $(PREFIX)/$(APP)/Contents/MacOS/ClipCat
 
+# signing identity: CLIPCAT_SIGN if set, else the keychain's first Apple Development
+# one, then Developer ID Application, else ad hoc (-), whose accessibility grant
+# macOS forgets at every build
+IDENTITIES = security find-identity -v -p codesigning 2>/dev/null
+find_id    = $(IDENTITIES) | sed -n 's/.*"\($(1):[^"]*\)".*/\1/p' | head -1
+SIGN      ?= $(or $(CLIPCAT_SIGN),$(shell $(call find_id,Apple Development)),$(shell $(call find_id,Developer ID Application)),-)
+
 .PHONY: build bundle install uninstall run
 
 build:
@@ -16,7 +23,12 @@ bundle: build
 	cp support/Info.plist build/$(APP)/Contents/Info.plist
 	mkdir -p build/$(APP)/Contents/Resources
 	cp -R support/fonts build/$(APP)/Contents/Resources/fonts
-	codesign --force --sign - --identifier $(LABEL) build/$(APP)
+	@case "$(SIGN)" in \
+	"Developer ID Application:"*) codesign --force --options runtime --timestamp --identifier $(LABEL) --sign "$(SIGN)" build/$(APP) ;; \
+	*) codesign --force --identifier $(LABEL) --sign "$(SIGN)" build/$(APP) ;; \
+	esac
+	codesign --verify --strict build/$(APP)
+	@echo "signed by: $(SIGN)"
 
 install: bundle
 	-launchctl bootout gui/$$(id -u)/$(LABEL) 2>/dev/null
