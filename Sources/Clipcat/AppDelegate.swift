@@ -38,7 +38,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             self.clips.refresh(keep: true)
         }
 
-        if !UserDefaults.standard.bool(forKey: "hideMenuBarIcon") { setUpStatus() }
+        shortcuts.onMenuBarIcon = { [weak self] on in self?.showMenuBarIcon(on) }
+        showMenuBarIcon(shortcuts.menuBarIcon)
         Paster.askForAccess()
     }
 
@@ -88,9 +89,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
 
-    private func setUpStatus() {
-        let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
-        item.button?.image = NSImage(systemSymbolName: "hare.fill", accessibilityDescription: "clipcat")
+    private func showMenuBarIcon(_ on: Bool) {
+        if !on {
+            if let status { NSStatusBar.system.removeStatusItem(status) }
+            status = nil
+            return
+        }
+        guard status == nil else { return }
+        let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
+        item.button?.title = "=^.^="
+        item.button?.font = NSFontManager.shared.font(withFamily: "Iosevka Rabbits", traits: [], weight: 5, size: 13)
+            ?? .monospacedSystemFont(ofSize: 13, weight: .regular)
+        item.button?.setAccessibilityLabel("clipcat")
         status = item
         updateMenu()
     }
@@ -101,7 +111,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         menu.addItem(withTitle: "clipboard  " + shortcuts.clips.label, action: #selector(showClips), keyEquivalent: "").target = self
         menu.addItem(withTitle: "emoji  " + shortcuts.emoji.label, action: #selector(showEmoji), keyEquivalent: "").target = self
         menu.addItem(.separator())
-        menu.addItem(withTitle: "shortcuts…", action: #selector(showSettings), keyEquivalent: ",").target = self
+        menu.addItem(withTitle: "settings…", action: #selector(showSettings), keyEquivalent: ",").target = self
         if !Paster.trusted {
             menu.addItem(withTitle: "allow pasting…", action: #selector(allowPasting), keyEquivalent: "").target = self
         }

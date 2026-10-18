@@ -54,12 +54,21 @@ final class Shortcuts: ObservableObject {
     @Published private(set) var clips: Shortcut
     @Published private(set) var emoji: Shortcut
     @Published var recording: Which? { didSet { onRecording?(recording != nil) } }
+    /// off unless you turn it on. ⌘, in either overlay gets you back here.
+    @Published var menuBarIcon: Bool {
+        didSet {
+            UserDefaults.standard.set(menuBarIcon, forKey: "showMenuBarIcon")
+            onMenuBarIcon?(menuBarIcon)
+        }
+    }
     var onChange: (() -> Void)?
     var onRecording: ((Bool) -> Void)?
+    var onMenuBarIcon: ((Bool) -> Void)?
 
     init() {
         clips = Self.load(.clips) ?? .clips
         emoji = Self.load(.emoji) ?? .emoji
+        menuBarIcon = UserDefaults.standard.bool(forKey: "showMenuBarIcon")
     }
 
     subscript(which: Which) -> Shortcut {
@@ -109,7 +118,7 @@ struct SettingsView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
-            Text("shortcuts").font(Theme.font(18))
+            Text("settings").font(Theme.font(18))
 
             row("clipboard", .clips)
             row("emoji", .emoji)
@@ -125,6 +134,13 @@ struct SettingsView: View {
                 Chip(text: "reset")
                     .onTapGesture { shortcuts.reset() }
             }
+
+            HStack {
+                Text("menu bar icon").font(Theme.font(14))
+                Spacer()
+                button(shortcuts.menuBarIcon ? "on" : "off", on: shortcuts.menuBarIcon)
+                    .onTapGesture { shortcuts.menuBarIcon.toggle() }
+            }
         }
         .padding(20)
         .frame(width: 360)
@@ -137,16 +153,20 @@ struct SettingsView: View {
         return HStack {
             Text(title).font(Theme.font(14))
             Spacer()
-            Text(on ? "press keys…" : shortcuts[which].label)
-                .font(Theme.font(14, on ? .bold : .regular))
-                .foregroundColor(on ? .white : Theme.ink)
-                .padding(.horizontal, 10)
-                .padding(.vertical, 4)
-                .frame(minWidth: 120)
-                .boxy(on ? Theme.pink : Theme.card, line: on ? Theme.pinkDark : Theme.ink, lifted: on)
-                .contentShape(Rectangle())
+            button(on ? "press keys…" : shortcuts[which].label, on: on)
                 .onTapGesture { shortcuts.recording = on ? nil : which }
         }
+    }
+
+    private func button(_ text: String, on: Bool) -> some View {
+        Text(text)
+            .font(Theme.font(14, on ? .bold : .regular))
+            .foregroundColor(on ? .white : Theme.ink)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 4)
+            .frame(minWidth: 120)
+            .boxy(on ? Theme.pink : Theme.card, line: on ? Theme.pinkDark : Theme.ink, lifted: on)
+            .contentShape(Rectangle())
     }
 }
 
@@ -179,7 +199,9 @@ final class SettingsWindow {
             )
             window.title = "clipcat"
             window.isReleasedWhenClosed = false
-            window.contentView = NSHostingView(rootView: SettingsView(shortcuts: shortcuts))
+            let host = NSHostingView(rootView: SettingsView(shortcuts: shortcuts))
+            window.contentView = host
+            window.setContentSize(host.fittingSize)
             window.center()
             NotificationCenter.default.addObserver(
                 forName: NSWindow.willCloseNotification, object: window, queue: .main

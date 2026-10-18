@@ -20,7 +20,7 @@ shadows that grow when something is picked, cream and cherries, hot pink
 - ⌃⌘C  clipboard
 - ⌃⌘E  emoji
 - ⌘,  (with either open) change those two. click one, press the new keys.
-  it needs ⌃, ⌥ or ⌘ in it. esc cancels. also in the menu bar as "shortcuts…"
+  it needs ⌃, ⌥ or ⌘ in it. esc cancels. also "settings…" in the menu bar icon's menu
 
 in the clipboard:
 
@@ -102,7 +102,7 @@ the keybindings themselves need no permission.
 
 ## settings
 
-    defaults write party.chee.clipcat hideMenuBarIcon -bool true
+⌘, in either overlay opens the settings: the two shortcuts, and a `=^.^=` in
+the menu bar (off to begin with).
 
-hides the 🐇 in the menu bar. relaunch to apply.
 with no icon, quit with `launchctl bootout gui/$(id -u)/party.chee.clipcat`.
