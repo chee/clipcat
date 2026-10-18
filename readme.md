@@ -1,109 +1,12 @@
-a macos launchctl background app that provides a keybinding for a fast, cute, minimal, chee rabbits style searchable clipboard manager with computer vision and a fast, cute, minimal emoji search and inputter in the same style boxy and bright in pure macos swift - clipboard with storage infinite history cached index fast low resources
-
-₍ᐢ•ﻌ•ᐢ₎
+macos app that provides
+overlay cute fast, cute, clipboard manager with history searchable images ⌃⌘C
+overlay cute fast, cute  emoji search filter ⌃⌘E
+=^.^=
 
 ![clipcat's clipboard overlay](screenshot.webp)
 
-## look
-
-a raycast-style overlay: it floats over whatever you're doing, takes the
-keyboard without stealing focus, and goes away when you're done. drag it by
-its edges, the space round the search bar, or the footer. if you open it again
-within 10 minutes it comes back where you left it.
-
-iosevka rabbits (bundled), thin black lines, tiny corners, hard little
-shadows that grow when something is picked, cream and cherries, hot pink
-(#e34685) for the picked thing, and things fading in one after another.
-
 ## keys
 
-- ⌃⌘C  clipboard
+- ⌃⌘C  clipboard manager
 - ⌃⌘E  emoji
-- ⌘,  (with either open) change those two. click one, press the new keys.
-  it needs ⌃, ⌥ or ⌘ in it. esc cancels. also "settings…" in the menu bar icon's menu
-
-in the clipboard:
-
-- type to search. every word is matched as a prefix against the text, and
-  against whatever vision read or saw in pictures. if nothing matches that
-  way it falls back to plain substring search
-- `@app` in the search narrows to things copied in that app (`@safari pasta`)
-- ⇥ / ⇧⇥  filter: all, pinned, text, links, pictures, files, colours
-  (or click the chips)
-- ↑ ↓  move
-- ↩  paste into the app you were in
-- ⌘↩  copy only
-- ⌘1–9  paste that one
-- ⌘P  pin. pinned clips stay at the top
-- ⌘O  open the link, or show the file or picture in finder
-- ⌘⌫  forget it
-- esc  close
-
-the preview on the right shows the whole thing (picture, swatch, link, file
-icons, text) and where it came from, how big it is, how many times it's been
-used, and when.
-
-in emoji:
-
-- type to search by name ("sob", "flag japan", "bunny")
-- ⇥ / ⇧⇥  filter: all, recent, faces, people, nature, food, things, flags
-- ← → ↑ ↓  move
-- ↩  type it into the app you were in (doesn't touch the clipboard)
-- ⌘↩  copy only
-
-## install
-
-needs macos 13+ and the swift toolchain (xcode or the command line tools).
-
-    make install
-
-builds `Clipcat.app` into `~/Applications`, writes
-`~/Library/LaunchAgents/party.chee.clipcat.plist` and loads it with
-`launchctl`, so it starts at login and comes back if it crashes.
-
-    make uninstall
-
-stops it and removes the app and the launch agent. history stays in
-`~/Library/Application Support/Clipcat` until you delete it.
-
-`make run` runs it from the terminal without installing.
-
-## permissions
-
-pasting and typing into other apps sends key presses, so macos asks for
-accessibility access the first time. without it, ↩ still copies and you
-press ⌘V yourself. the app is signed with your keychain's apple development
-identity (else developer id, else ad hoc), so the grant survives rebuilds; set
-CLIPCAT_SIGN to pick another. if it ends up ad hoc, you might need to toggle it
-off and on again in system settings → privacy & security → accessibility.
-
-the keybindings themselves need no permission.
-
-## how
-
-- **history** is infinite. every clip goes into sqlite
-  (`~/Library/Application Support/Clipcat/clips.sqlite`) with an fts5 index
-  over the text. copying the same thing again moves it to the top instead of
-  storing it twice.
-- **pictures** are saved as png next to the database, named by hash. vision
-  reads the text in them (`VNRecognizeTextRequest`) and guesses what they
-  show (`VNClassifyImageRequest`), in the background, and that goes in the
-  index too. thumbnails are decoded small and cached.
-- **files** copied in finder are remembered as paths and paste back as files.
-- **links and colours** are text, but get spotted when copied (a lone url;
-  `#rgb`/`#rrggbb`, `rgb()`, `oklch()` and friends) so they can be filtered
-  and previewed.
-- **secrets** marked concealed or transient on the pasteboard (password
-  managers do this) are skipped.
-- **watching** is one integer read every 0.4s (`NSPasteboard.changeCount`).
-  no accessibility needed for that part.
-- **emoji** come from the unicode tables built into the os, plus every
-  country flag, with recently used ones first.
-
-## settings
-
-⌘, in either overlay opens the settings: the two shortcuts, start at login
-(on after `make install`; it's the launch agent), and a `=^.^=` in the menu
-bar (off to begin with).
-
-with no icon, quit with `launchctl bootout gui/$(id -u)/party.chee.clipcat`.
+- ⌘,  (with either open) change keybindings
