@@ -1,1 +1,78 @@
 a macos launchctl background app that provides a keybinding for a fast, cute, minimal, chee rabbits style searchable clipboard manager with computer vision and a fast, cute, minimal emoji search and inputter in the same style boxy and bright in pure macos swift - clipboard with storage infinite history cached index fast low resources
+
+₍ᐢ•ﻌ•ᐢ₎
+
+## keys
+
+- ⌃⌘V  clipboard
+- ⌃⌘E  emoji
+
+in the clipboard:
+
+- type to search. words are matched as prefixes against the text, and against
+  whatever vision read or saw in pictures
+- ↑ ↓  move
+- ↩  paste into the app you were in
+- ⌘↩  copy only
+- ⌘1–9  paste that one
+- ⌘⌫  forget it
+- esc  close
+
+in emoji:
+
+- type to search by name ("sob", "flag japan", "bunny")
+- ← → ↑ ↓  move
+- ↩  type it into the app you were in (doesn't touch the clipboard)
+- ⌘↩  copy only
+
+## install
+
+needs macos 13+ and the swift toolchain (xcode or the command line tools).
+
+    make install
+
+builds `ClipCat.app` into `~/Applications`, writes
+`~/Library/LaunchAgents/party.chee.clipcat.plist` and loads it with
+`launchctl`, so it starts at login and comes back if it crashes.
+
+    make uninstall
+
+stops it and removes the app and the launch agent. history stays in
+`~/Library/Application Support/ClipCat` until you delete it.
+
+`make run` runs it from the terminal without installing.
+
+## permissions
+
+pasting and typing into other apps sends key presses, so macos asks for
+accessibility access the first time. without it, ↩ still copies and you
+press ⌘V yourself. the app is signed ad hoc, so after a rebuild you might
+need to toggle it off and on again in system settings → privacy & security
+→ accessibility.
+
+the keybindings themselves need no permission.
+
+## how
+
+- **history** is infinite. every clip goes into sqlite
+  (`~/Library/Application Support/ClipCat/clips.sqlite`) with an fts5 index
+  over the text. copying the same thing again moves it to the top instead of
+  storing it twice.
+- **pictures** are saved as png next to the database, named by hash. vision
+  reads the text in them (`VNRecognizeTextRequest`) and guesses what they
+  show (`VNClassifyImageRequest`), in the background, and that goes in the
+  index too. thumbnails are decoded small and cached.
+- **files** copied in finder are remembered as paths and paste back as files.
+- **secrets** marked concealed or transient on the pasteboard (password
+  managers do this) are skipped.
+- **watching** is one integer read every 0.4s (`NSPasteboard.changeCount`).
+  no accessibility needed for that part.
+- **emoji** come from the unicode tables built into the os, plus every
+  country flag, with recently used ones first.
+
+## settings
+
+    defaults write party.chee.clipcat hideMenuBarIcon -bool true
+
+hides the 🐇 in the menu bar. relaunch to apply.
+with no icon, quit with `launchctl bootout gui/$(id -u)/party.chee.clipcat`.
