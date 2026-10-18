@@ -53,14 +53,14 @@ needs macos 13+ and the swift toolchain (xcode or the command line tools).
 
     make install
 
-builds `ClipCat.app` into `~/Applications`, writes
+builds `Clipcat.app` into `~/Applications`, writes
 `~/Library/LaunchAgents/party.chee.clipcat.plist` and loads it with
 `launchctl`, so it starts at login and comes back if it crashes.
 
     make uninstall
 
 stops it and removes the app and the launch agent. history stays in
-`~/Library/Application Support/ClipCat` until you delete it.
+`~/Library/Application Support/Clipcat` until you delete it.
 
 `make run` runs it from the terminal without installing.
 
@@ -78,7 +78,7 @@ the keybindings themselves need no permission.
 ## how
 
 - **history** is infinite. every clip goes into sqlite
-  (`~/Library/Application Support/ClipCat/clips.sqlite`) with an fts5 index
+  (`~/Library/Application Support/Clipcat/clips.sqlite`) with an fts5 index
   over the text. copying the same thing again moves it to the top instead of
   storing it twice.
 - **pictures** are saved as png next to the database, named by hash. vision

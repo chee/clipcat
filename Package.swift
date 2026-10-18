@@ -2,12 +2,12 @@
 import PackageDescription
 
 let package = Package(
-    name: "ClipCat",
+    name: "Clipcat",
     platforms: [.macOS(.v13)],
     targets: [
         .executableTarget(
-            name: "ClipCat",
-            path: "Sources/ClipCat",
+            name: "Clipcat",
+            path: "Sources/Clipcat",
             linkerSettings: [.linkedLibrary("sqlite3")]
         )
     ]

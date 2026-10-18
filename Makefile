@@ -1,8 +1,8 @@
-APP    = ClipCat.app
+APP    = Clipcat.app
 LABEL  = party.chee.clipcat
 PREFIX ?= $(HOME)/Applications
 AGENT  = $(HOME)/Library/LaunchAgents/$(LABEL).plist
-BIN    = $(PREFIX)/$(APP)/Contents/MacOS/ClipCat
+BIN    = $(PREFIX)/$(APP)/Contents/MacOS/Clipcat
 
 # signing identity: CLIPCAT_SIGN if set, else the keychain's first Apple Development
 # one, then Developer ID Application, else ad hoc (-), whose accessibility grant
@@ -19,7 +19,7 @@ build:
 bundle: build
 	rm -rf build/$(APP)
 	mkdir -p build/$(APP)/Contents/MacOS
-	cp .build/release/ClipCat build/$(APP)/Contents/MacOS/ClipCat
+	cp .build/release/Clipcat build/$(APP)/Contents/MacOS/Clipcat
 	cp support/Info.plist build/$(APP)/Contents/Info.plist
 	mkdir -p build/$(APP)/Contents/Resources
 	cp -R support/fonts build/$(APP)/Contents/Resources/fonts

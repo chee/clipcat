@@ -45,7 +45,7 @@ final class Store {
 
     private init() {
         let base = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
-            .appendingPathComponent("ClipCat", isDirectory: true)
+            .appendingPathComponent("Clipcat", isDirectory: true)
         imageDir = base.appendingPathComponent("images", isDirectory: true)
         try? FileManager.default.createDirectory(at: imageDir, withIntermediateDirectories: true)
         let path = base.appendingPathComponent("clips.sqlite").path
