@@ -2,6 +2,8 @@ a macos launchctl background app that provides a keybinding for a fast, cute, mi
 
 ₍ᐢ•ﻌ•ᐢ₎
 
+![clipcat's clipboard overlay](screenshot.webp)
+
 ## look
 
 a raycast-style overlay: it floats over whatever you're doing, takes the
