@@ -11,7 +11,7 @@ IDENTITIES = security find-identity -v -p codesigning 2>/dev/null
 find_id    = $(IDENTITIES) | sed -n 's/.*"\($(1):[^"]*\)".*/\1/p' | head -1
 SIGN      ?= $(or $(CLIPCAT_SIGN),$(shell $(call find_id,Apple Development)),$(shell $(call find_id,Developer ID Application)),-)
 
-.PHONY: build bundle install uninstall run
+.PHONY: build bundle install uninstall run release
 
 build:
 	swift build -c release
@@ -46,3 +46,6 @@ uninstall:
 
 run:
 	swift run
+
+release:
+	support/release.sh
